@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: roadmap-tracker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker -w 4
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        value: sqlite:///./tasks.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false 

@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025 Roadmap Tracker</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Login Form -->
+    <div id="loginForm" class="auth-form">
+        <h1>Login</h1>
+        <div id="loginError" class="error-message"></div>
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn-primary">Login</button>
+        </form>
+    </div>
+
+    <!-- Main Content (Hidden until logged in) -->
+    <div id="mainContent" style="display: none;">
+        <header class="header">
+            <h1>2025 Roadmap Tracker</h1>
+            <button onclick="logout()" class="btn-logout">Logout</button>
+        </header>
+
+        <main class="container">
+            <!-- Task Statistics -->
+            <div class="task-stats">
+                <div class="stat-card">
+                    <h4>Not Started</h4>
+                    <div class="number" id="statsNotStarted">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>In Progress</h4>
+                    <div class="number" id="statsInProgress">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Completed</h4>
+                    <div class="number" id="statsCompleted">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Total Tasks</h4>
+                    <div class="number" id="totalCount">0</div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <section class="filters">
+                <h2>Filters</h2>
+                <div class="filter-group">
+                    <div class="form-group">
+                        <label for="filterStatus">Status:</label>
+                        <select id="filterStatus" class="form-control">
+                            <option value="all">All</option>
+                            <option value="not_started">Not Started</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterPhase">Phase:</label>
+                        <select id="filterPhase" class="form-control">
+                            <option value="all">All</option>
+                            <option value="Phase 1">Phase 1</option>
+                            <option value="Phase 2">Phase 2</option>
+                            <option value="Phase 3">Phase 3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterWeek">Week:</label>
+                        <select id="filterWeek" class="form-control">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Add New Task -->
+            <section class="add-task">
+                <h2>Add New Task</h2>
+                <form id="taskForm" class="task-form" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="title">Title</label>
+                        <input type="text" id="title" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="filter-group">
+                        <div class="form-group">
+                            <label for="deadline">Deadline</label>
+                            <input type="datetime-local" id="deadline" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reminderTime">Reminder Time</label>
+                            <input type="datetime-local" id="reminderTime" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select id="status" class="form-control" required>
+                                <option value="not_started">Not Started</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="phase">Phase</label>
+                            <select id="phase" class="form-control" required>
+                                <option value="Phase 1">Phase 1</option>
+                                <option value="Phase 2">Phase 2</option>
+                                <option value="Phase 3">Phase 3</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="weekNumber">Week Number</label>
+                            <input type="number" id="weekNumber" class="form-control" min="1" max="52" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolsResources">Tools & Resources</label>
+                        <input type="text" id="toolsResources" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" onclick="handleTaskSubmit(event)">Add Task</button>
+                </form>
+            </section>
+
+            <!-- Task List -->
+            <section class="tasks">
+                <h2>Tasks</h2>
+                <div id="taskList" class="task-list">
+                    <!-- Tasks will be dynamically added here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="container">
+        <div id="errorMessage" class="error-message"></div>
+    </div>
+
+    <script>
+        let token = null;
+        let tasks = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check for existing token
+            const savedToken = localStorage.getItem('token');
+            if (savedToken) {
+                // Validate token by trying to fetch tasks
+                try {
+                    const response = await fetch('/tasks/', {
+                        headers: {
+                            'Authorization': `Bearer ${savedToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Invalid token');
+                    }
+
+                    // Token is valid
+                    token = savedToken;
+                    showMainContent();
+                    const data = await response.json();
+                    tasks = data;
+                    updateTaskList();
+                    updateTaskStats();
+                } catch (error) {
+                    console.error('Token validation failed:', error);
+                    // Clear invalid token and show login form
+                    localStorage.removeItem('token');
+                    document.getElementById('loginForm').style.display = 'block';
+                    document.getElementById('mainContent').style.display = 'none';
+                }
+            } else {
+                // No token found, show login form
+                document.getElementById('loginForm').style.display = 'block';
+                document.getElementById('mainContent').style.display = 'none';
+            }
+            
+            // Add event listeners for filters
+            document.getElementById('filterStatus').addEventListener('change', updateTaskList);
+            document.getElementById('filterPhase').addEventListener('change', updateTaskList);
+            document.getElementById('filterWeek').addEventListener('change', updateTaskList);
+        });
+
+        // Handle Login
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.access_token;
+                    localStorage.setItem('token', token);
+                    showMainContent();
+                    await fetchTasks();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('loginError').textContent = error.detail || 'Login failed';
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('loginError').textContent = 'An error occurred during login';
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        // Show main content after login
+        function showMainContent() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+        
+        // Fetch tasks from the server
+        async function fetchTasks() {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    console.error('No token found');
+                    return;
+                }
+
+                const response = await fetch('/tasks/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Fetched tasks:', data); // Debug log
+                tasks = data;
+                updateTaskList();
+                updateTaskStats();
+            } catch (error) {
+                console.error('Error fetching tasks:', error);
+                showError('Failed to load tasks. Please try refreshing the page.');
+            }
+        }
+
+        // Update task statistics
+        function updateTaskStats() {
+            const stats = tasks.reduce((acc, task) => {
+                acc[task.status] = (acc[task.status] || 0) + 1;
+                return acc;
+            }, {});
+
+            document.getElementById('statsNotStarted').textContent = stats.not_started || 0;
+            document.getElementById('statsInProgress').textContent = stats.in_progress || 0;
+            document.getElementById('statsCompleted').textContent = stats.completed || 0;
+            document.getElementById('totalCount').textContent = tasks.length;
+        }
+
+        // Update task list with filters
+        function updateTaskList() {
+            const statusFilter = document.getElementById('filterStatus').value;
+            const phaseFilter = document.getElementById('filterPhase').value;
+            const weekFilter = document.getElementById('filterWeek').value;
+
+            const filteredTasks = tasks.filter(task => {
+                const statusMatch = statusFilter === 'all' || task.status === statusFilter;
+                const phaseMatch = phaseFilter === 'all' || task.phase === phaseFilter;
+                const weekMatch = weekFilter === 'all' || task.week_number.toString() === weekFilter;
+                return statusMatch && phaseMatch && weekMatch;
+            });
+
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = filteredTasks.map(task => `
+                <div class="task-card">
+                    <h3>${task.title}</h3>
+                    <div class="task-meta">
+                        <span class="task-status status-${task.status}">${task.status.replace('_', ' ')}</span>
+                        <span>Week ${task.week_number}</span>
+                        <span>${task.phase}</span>
+                    </div>
+                    <p>${task.description}</p>
+                    <div class="task-dates">
+                        <p><strong>Deadline:</strong> ${new Date(task.deadline).toLocaleString()}</p>
+                        <p><strong>Reminder:</strong> ${new Date(task.reminder_time).toLocaleString()}</p>
+                    </div>
+                    ${task.tools_resources ? `<p><strong>Tools & Resources:</strong> ${task.tools_resources}</p>` : ''}
+                    ${task.notes ? `<p><strong>Notes:</strong> ${task.notes}</p>` : ''}
+                    <div class="task-actions">
+                        <button onclick="updateTaskStatus('${task.id}', '${task.status}')" class="btn btn-status">
+                            ${task.status === 'not_started' ? 'Start Task' : 
+                              task.status === 'in_progress' ? 'Complete Task' : 'Restart Task'}
+                        </button>
+                        <button onclick="editTask('${task.id}')" class="btn btn-edit">Edit</button>
+                        <button onclick="deleteTask('${task.id}')" class="btn btn-delete">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update task status
+        async function updateTaskStatus(taskId, currentStatus) {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    showError('You must be logged in to update tasks');
+                    return;
+                }
+
+                const statusFlow = {
+                    'not_started': 'in_progress',
+                    'in_progress': 'completed',
+                    'completed': 'not_started'
+                };
+
+                const newStatus = statusFlow[currentStatus];
+                const task = tasks.find(t => t.id === parseInt(taskId));
+                if (!task) {
+                    throw new Error('Task not found');
+                }
+
+                const response = await fetch(`/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ...task,
+                        status: newStatus
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update task status');
+                }
+
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'success-message';
+                successMessage.textContent = 'Task status updated successfully!';
+                document.body.appendChild(successMessage);
+                setTimeout(() => successMessage.remove(), 3000);
+
+                // Refresh tasks
+                await fetchTasks();
+            } catch (error) {
+                console.error('Error updating task status:', error);
+                showError(error.message || 'Failed to update task status');
+            }
+        }
+
+        // Edit task
+        async function editTask(taskId) {
+            try {
+                const task = tasks.find(t => t.id === parseInt(taskId));
+                if (!task) {
+                    throw new Error('Task not found');
+                }
+
+                // Format date strings for datetime-local input
+                const formatDate = (dateString) => {
+                    const date = new Date(dateString);
+                    return date.toISOString().slice(0, 16);
+                };
+
+                // Populate form with task data
+                document.getElementById('title').value = task.title;
+                document.getElementById('description').value = task.description;
+                document.getElementById('deadline').value = formatDate(task.deadline);
+                document.getElementById('reminderTime').value = formatDate(task.reminder_time);
+                document.getElementById('status').value = task.status;
+                document.getElementById('phase').value = task.phase;
+                document.getElementById('weekNumber').value = task.week_number;
+                document.getElementById('toolsResources').value = task.tools_resources || '';
+                document.getElementById('notes').value = task.notes || '';
+
+                // Change form submit button
+                const submitButton = document.getElementById('taskForm').querySelector('button[type="submit"]');
+                submitButton.textContent = 'Update Task';
+                
+                // Store task ID for update
+                document.getElementById('taskForm').dataset.editTaskId = taskId;
+
+                // Scroll to form
+                document.querySelector('.add-task').scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                console.error('Error editing task:', error);
+                showError(error.message || 'Failed to edit task');
+            }
+        }
+
+        // Delete task
+        async function deleteTask(taskId) {
+            try {
+                if (!confirm('Are you sure you want to delete this task?')) {
+                    return;
+                }
+
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    showError('You must be logged in to delete tasks');
+                    return;
+                }
+
+                const response = await fetch(`/tasks/${taskId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete task');
+                }
+
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'success-message';
+                successMessage.textContent = 'Task deleted successfully!';
+                document.body.appendChild(successMessage);
+                setTimeout(() => successMessage.remove(), 3000);
+
+                // Refresh tasks
+                await fetchTasks();
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                showError(error.message || 'Failed to delete task');
+            }
+        }
+
+        // Handle task form submission
+        document.getElementById('taskForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    showError('You must be logged in to manage tasks');
+                    return;
+                }
+
+                const formData = {
+                    title: document.getElementById('title').value,
+                    description: document.getElementById('description').value,
+                    deadline: document.getElementById('deadline').value,
+                    reminder_time: document.getElementById('reminderTime').value,
+                    status: document.getElementById('status').value,
+                    phase: document.getElementById('phase').value,
+                    week_number: parseInt(document.getElementById('weekNumber').value),
+                    tools_resources: document.getElementById('toolsResources').value,
+                    notes: document.getElementById('notes').value
+                };
+
+                const editTaskId = this.dataset.editTaskId;
+                const method = editTaskId ? 'PUT' : 'POST';
+                const url = editTaskId ? `/tasks/${editTaskId}` : '/tasks/';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(editTaskId ? 'Failed to update task' : 'Failed to create task');
+                }
+
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'success-message';
+                successMessage.textContent = `Task ${editTaskId ? 'updated' : 'created'} successfully!`;
+                document.body.appendChild(successMessage);
+                setTimeout(() => successMessage.remove(), 3000);
+
+                // Reset form
+                this.reset();
+                this.dataset.editTaskId = '';
+                this.querySelector('button[type="submit"]').textContent = 'Add Task';
+
+                // Refresh tasks
+                await fetchTasks();
+            } catch (error) {
+                console.error('Error submitting task:', error);
+                showError(error.message || 'Failed to submit task');
+            }
+        });
+
+        // Add logout functionality
+        function logout() {
+            localStorage.removeItem('token');
+            token = null;
+            tasks = [];
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        // Add this function to show errors to the user
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 5000);
+            } else {
+                alert(message);
+            }
+        }
+    </script>
+</body>
+</html> 
